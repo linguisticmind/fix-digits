@@ -22,11 +22,9 @@ For example:
 100-name.ext   ->   100-name.ext
 ```
 
-<!--
-A video tutorial:
+Video tutorial:
 
-[![Mindful Technology - <title>](https://img.youtube.com/vi/<id>/0.jpg)](https://www.youtube.com/watch?v=<id>)
--->
+[![Mindful Technology - fix digits: add leading zeros to numbers in filenames](https://img.youtube.com/vi/ksyw7mit6g4/0.jpg)](https://www.youtube.com/watch?v=ksyw7mit6g4)
 
 ## Installation
 
