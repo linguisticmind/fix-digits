@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+# fix-digits - add leading zeros to numbers in filenames
+# copyright (c) 2023  Alex Rogers (https://github.com/linguisticmind)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+version=0.1.0
+
+function repeat_str { [[ $2 = 0 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
+
+getopt -T > /dev/null
+[[ $? != 4 ]] && { printf '[%s] %s\n' "${BASH_SOURCE##*/}" 'Enhanced getopt is required to run this script.' >&2; exit 1; }
+
+help='fix-digits [<options>] [<file> ...]
+
+-b, --before=<regex>  Regular expression to match the part of the filenames 
+                      immediately preceding the numbers.
+
+-a, --after=<regex>   Regular expression to match the part of the filenames 
+                      immediately following the numbers.
+
+-r, --rename          Rename the files instead of simulating the renaming.
+
+-R, --no-rename       Do not rename the files, only simulate the renaming.
+
+-c, --color           Colorize the output.
+
+-C, --no-color        Disable colorization of the output.
+
+-h, --help            Print help.
+
+-V, --version         Print version information.
+'
+
+opts=$(IFS=' ' getopt -n "${BASH_SOURCE##*/}" -o 'b:,a:,r,R,c,C,h,V,' -l 'before:,after:,rename,no-rename,color,no-color,help,version,' -- "$@")
+
+[[ $? != 0 ]] && exit 1
+
+eval set -- "$opts"
+
+opt_before='^'
+opt_after='-.*$'
+opt_rename=
+opt_color=1
+
+test -f "${XDG_CONFIG_HOME:-$HOME/.config}"/fix-digits/config.bash && source "$_"
+
+while true; do
+  case $1 in
+    -b | --before ) opt_before="$2"; shift 2 ;;
+    -a | --after ) opt_after="$2"; shift 2 ;;
+    -r | --rename ) opt_rename=1; shift ;;
+    -R | --no-rename ) opt_rename=; shift ;;
+    -c | --color ) opt_color=1; shift ;;
+    -C | --no-color ) opt_color=; shift ;;
+    -h | --help ) printf '%s\n' "$help"; exit ;;
+    -V | --version ) printf '%s\n' "$version"; exit ;;
+    -- ) shift; break ;;
+    * ) printf '[%s] %s\n' "${BASH_SOURCE##*/}" 'Internal error: unable to parse option `'"$1"'`.' >&2; exit 1 ;;
+  esac
+done
+
+if [[ $opt_before =~ (^|[^\\])[()] || $opt_after =~ (^|[^\\])[()] ]]; then
+
+  opt_before_err_highlight=$(<<<"$opt_before" sed -E 's/(^|[^\\])([()])/\1'${opt_color:+'\x1b[7m'}'\2'${opt_color:+'\x1b[27m'}'/g')
+  opt_after_err_highlight=$(<<<"$opt_after" sed -E 's/(^|[^\\])([()])/\1'${opt_color:+'\x1b[7m'}'\2'${opt_color:+'\x1b[27m'}'/g')
+
+  printf \
+    ${opt_color:+'\x1b[31m'}'[%s] %s: --before='\''%s'\'' --after='\''%s'\'${opt_color:+'\x1b[39m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Use of capture groups in regular expressions set with `-b, --before` and `-a, --after` options is not allowed' \
+    "${opt_before_err_highlight//\'/\'\\\'\'}" "${opt_after_err_highlight//\'/\'\\\'\'}" >&2
+
+  exit 1
+
+fi
+
+[[ $# = 0 ]] && set -- *
+
+re='('"$opt_before"')(0*[[:digit:]]+)('"$opt_after"')'
+files=()
+digits_width=
+
+for file; do
+  if [[ ${file##*/} =~ $re ]]; then
+    files+=("$file")
+    [[ ${#BASH_REMATCH[2]} -gt "$digits_width" ]] && digits_width="${#BASH_REMATCH[2]}"
+  fi
+done
+
+if [[ ! $opt_rename ]]; then
+  printf \
+    ${opt_color:+'\x1b[2m'}'[%s] %s'${opt_color:+'\x1b[22m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Simulating.' >&2
+else
+  printf \
+    ${opt_color:+'\x1b[32m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Renaming.' >&2
+fi
+
+while read -rd '' old_filename; do
+
+  [[ ${old_filename##*/} =~ $re ]]
+
+  zero_padding=$(repeat_str '0' "$((digits_width - ${#BASH_REMATCH[2]}))")
+
+  file_path=
+  [[ $old_filename = */* ]] && file_path="${old_filename%/*}"
+
+  new_filename="${file_path:+$file_path/}""${BASH_REMATCH[1]}""$zero_padding""${BASH_REMATCH[2]}""${BASH_REMATCH[3]}"
+
+  if [[ $old_filename != "$new_filename" && \
+        -f "$new_filename" ]]; then
+    printf \
+      ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+      "${BASH_SOURCE##*/}" \
+      'Not renaming '\'"${old_filename//\'/\'\\\'\'}"\'' -> '\'"${new_filename//\'/\'\\\'\'}"\''. '\'"${new_filename//\'/\'\\\'\'}"\'' already exists.' >&2
+    files_skipped=1
+    continue
+  fi
+
+  printf \
+    '%s'${opt_color:+'\x1b[2;48;5;234;7'${opt_rename:+';32'}'m'}'%s'${opt_color:+'\x1b['${opt_rename:+'39;'}'27m'}'%s'${opt_color:+'\x1b[49;22m'}'%s\n' \
+    "${file_path:+$file_path/}""${BASH_REMATCH[1]}" "$zero_padding" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+
+  if [[ $opt_rename && \
+        $old_filename != "$new_filename" ]]; then
+    :
+    mv "$old_filename" "$new_filename"
+  fi
+
+done < <([[ ${#files[@]} -gt 0 ]] && printf '%s\0' "${files[@]}" | sort -Vz)
+
+if [[ ! $opt_rename ]]; then
+  printf \
+    ${opt_color:+'\x1b[2m'}'[%s] %s'${opt_color:+'\x1b[22m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Simulation complete.' >&2
+else
+  printf \
+    ${opt_color:+'\x1b[32m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Done renaming.' >&2
+fi
+
+if [[ $files_skipped ]]; then
+  printf \
+    ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+    "${BASH_SOURCE##*/}" \
+    'Some files were not renamed because other files with the same name already existed.' >&2
+  exit 2
+fi
