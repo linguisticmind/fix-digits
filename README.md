@@ -68,13 +68,7 @@ Video tutorial:
 
 ## Dependencies
 
-`search-in-subs` requires that [`mpv`](https://mpv.io/), [`ffmpeg`](https://ffmpeg.org/) and [`lua`](https://www.lua.org/) (v5.4) be installed to use [mpv EDL](https://github.com/mpv-player/mpv/blob/master/DOCS/edl-mpv.rst) generation functionality.
-
-On Debian, run `sudo apt install mpv ffmpeg lua5.4` to install these dependencies.
-
-`lua` 5.4 is the version of `lua` that `search-in-subs` was tested with. `search-in-subs` first checks `PATH` for a binary called `lua5.4`, and if that is not available, it uses `lua` as a fallback binary name.
-
-`search-in-subs` was written and tested on Debian 12, and takes advantage of standard utilities that come with the system. In order to run `search-in-subs` on other systems, make sure that the following are installed and available on system's `PATH`:
+`fix-digits` was written and tested on Debian 12, and takes advantage of standard utilities that come with the system. In order to run `search-in-subs` on other systems, make sure that the following are installed and available on system's `PATH`:
 
 * Bash >= 5.2.15
 * Enhanced getopt
