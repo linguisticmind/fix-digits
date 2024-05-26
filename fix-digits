@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.1.0
+version=0.1.1
 
 function repeat_str { [[ $2 = 0 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
@@ -25,26 +25,34 @@ getopt -T > /dev/null
 
 help='fix-digits [<options>] [<file> ...]
 
--b, --before=<regex>  Regular expression to match the part of the filenames 
-                      immediately preceding the numbers.
+-b, --before=<regex>
+        Regular expression to match the part of the 
+        filenames immediately preceding the numbers.
 
--a, --after=<regex>   Regular expression to match the part of the filenames 
-                      immediately following the numbers.
+-a, --after=<regex>
+        Regular expression to match the part of the 
+        filenames immediately following the numbers.
 
--r, --rename          Rename the files instead of simulating the renaming.
+-r, --rename
+        Rename the files instead of simulating the renaming.
 
--R, --no-rename       Do not rename the files, only simulate the renaming.
+-R, --no-rename
+        Do not rename the files, only simulate the renaming.
 
--c, --color           Colorize the output.
+-c, --color
+        Colorize the output.
 
--C, --no-color        Disable colorization of the output.
+-C, --no-color
+        Disable colorization of the output.
 
--h, --help            Print help.
+-h, --help
+        Print help.
 
--V, --version         Print version information.
+-V, --version
+        Print version information.
 '
 
-opts=$(IFS=' ' getopt -n "${BASH_SOURCE##*/}" -o 'b:,a:,r,R,c,C,h,V,' -l 'before:,after:,rename,no-rename,color,no-color,help,version,' -- "$@")
+opts=$(getopt -n "${BASH_SOURCE##*/}" -o 'b:,a:,r,R,c,C,h,V,' -l 'before:,after:,rename,no-rename,color,no-color,help,version,' -- "$@")
 
 [[ $? != 0 ]] && exit 1
 
@@ -55,7 +63,7 @@ opt_after='-.*$'
 opt_rename=
 opt_color=1
 
-test -f "${XDG_CONFIG_HOME:-$HOME/.config}"/fix-digits/config.bash && source "$_"
+test -f "${XDG_CONFIG_HOME:-$HOME/.config}"'/fix-digits/config.bash' && source "$_"
 
 while true; do
   case $1 in
@@ -72,17 +80,14 @@ while true; do
   esac
 done
 
+shopt -s extglob
+
 if [[ $opt_before =~ (^|[^\\])[()] || $opt_after =~ (^|[^\\])[()] ]]; then
 
-  opt_before_err_highlight=$(<<<"$opt_before" sed -E 's/(^|[^\\])([()])/\1'${opt_color:+'\x1b[7m'}'\2'${opt_color:+'\x1b[27m'}'/g')
-  opt_after_err_highlight=$(<<<"$opt_after" sed -E 's/(^|[^\\])([()])/\1'${opt_color:+'\x1b[7m'}'\2'${opt_color:+'\x1b[27m'}'/g')
-
   printf \
-    ${opt_color:+'\x1b[31m'}'[%s] %s: --before='\''%s'\'' --after='\''%s'\'${opt_color:+'\x1b[39m'}'\n' \
+    ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
     "${BASH_SOURCE##*/}" \
-    'Use of capture groups in regular expressions set with `-b, --before` and `-a, --after` options is not allowed' \
-    "${opt_before_err_highlight//\'/\'\\\'\'}" "${opt_after_err_highlight//\'/\'\\\'\'}" >&2
-
+    'Use of capture groups in regular expressions set with `-b, --before` and `-a, --after` is not allowed: --before='"${opt_before@Q}"' --after='"${opt_after@Q}" >&2
   exit 1
 
 fi
@@ -119,27 +124,30 @@ while read -rd '' old_filename; do
   zero_padding=$(repeat_str '0' "$((digits_width - ${#BASH_REMATCH[2]}))")
 
   file_path=
-  [[ $old_filename = */* ]] && file_path="${old_filename%/*}"
+  [[ $old_filename = */* ]] && file_path="${old_filename%/*}" file_path="${file_path:-/}"
 
-  new_filename="${file_path:+$file_path/}""${BASH_REMATCH[1]}""$zero_padding""${BASH_REMATCH[2]}""${BASH_REMATCH[3]}"
+  old_filename="${old_filename//+(\/)/\/}"
+
+  file_path_filename_before=${file_path:+"$file_path"/}"${BASH_REMATCH[1]}" file_path_filename_before="${file_path_filename_before//+(\/)/\/}"
+
+  new_filename="$file_path_filename_before""$zero_padding""${BASH_REMATCH[2]}""${BASH_REMATCH[3]}"
 
   if [[ $old_filename != "$new_filename" && \
-        -f "$new_filename" ]]; then
+        -e "$new_filename" ]]; then
     printf \
       ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
       "${BASH_SOURCE##*/}" \
-      'Not renaming '\'"${old_filename//\'/\'\\\'\'}"\'' -> '\'"${new_filename//\'/\'\\\'\'}"\''. '\'"${new_filename//\'/\'\\\'\'}"\'' already exists.' >&2
+      'Not renaming '"${old_filename@Q}"' -> '"${new_filename@Q}"'. '"${new_filename@Q}"' already exists.' >&2
     files_skipped=1
     continue
   fi
 
   printf \
     '%s'${opt_color:+'\x1b[2;48;5;234;7'${opt_rename:+';32'}'m'}'%s'${opt_color:+'\x1b['${opt_rename:+'39;'}'27m'}'%s'${opt_color:+'\x1b[49;22m'}'%s\n' \
-    "${file_path:+$file_path/}""${BASH_REMATCH[1]}" "$zero_padding" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+    "$file_path_filename_before" "$zero_padding" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
 
   if [[ $opt_rename && \
         $old_filename != "$new_filename" ]]; then
-    :
     mv "$old_filename" "$new_filename"
   fi
 

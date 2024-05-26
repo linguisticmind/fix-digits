@@ -26,6 +26,61 @@ Video tutorial:
 
 [![Mindful Technology - fix digits: add leading zeros to numbers in filenames](https://img.youtube.com/vi/ksyw7mit6g4/0.jpg)](https://www.youtube.com/watch?v=ksyw7mit6g4)
 
+## Changelog
+
+<table>
+    <tr>
+        <th>Version</th>
+        <th>Date</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.1'>0.1.1</a>
+        </td>
+        <td>
+            2024-05-26
+        </td>
+        <td>
+            <p>
+                <b>CRITICAL</b>: Fixed a bug where the check for already existing files was only performed for regular files, but not directories.<br>
+                Fixed a bug which would result in incorrect handling of files located in the root directory (<code>/</code>) if passed as absolute paths (<code>/1-file /2-file ...</code>).<br>
+                Duplicate forward slashes in paths are now removed as appropriate.
+            </p>
+            <p>
+                Improved the method of quoting strings for displaying them in messages. All instances of using <code>\'"${parameter//\'/\'\\\'\'}"\'</code> were replaced with <code>"${parameter@Q}"</code>.<br>
+                Improved code for the <code>Use of capture groups in regular expressions set with `-b, --before` and `-a, --after` is not allowed</code> error message. Removed <code>sed</code> dependency.
+            </p>
+            <p>
+                Improved formatting of the built-in help message.<br>
+                Added information about dependencies to README.<br>
+                Added a changelog.
+            </p>
+            <p>
+                Removed a superfluous <code>IFS=' '</code> from the <code>getopt</code> line.<br>
+                Removed a superfluous <code>:</code> on the line preceding the <code>mv</code> command.
+            </p>
+        </td>
+    </tr>
+</table>
+
+[Read more](CHANGELOG.md)
+
+## Dependencies
+
+`search-in-subs` requires that [`mpv`](https://mpv.io/), [`ffmpeg`](https://ffmpeg.org/) and [`lua`](https://www.lua.org/) (v5.4) be installed to use [mpv EDL](https://github.com/mpv-player/mpv/blob/master/DOCS/edl-mpv.rst) generation functionality.
+
+On Debian, run `sudo apt install mpv ffmpeg lua5.4` to install these dependencies.
+
+`lua` 5.4 is the version of `lua` that `search-in-subs` was tested with. `search-in-subs` first checks `PATH` for a binary called `lua5.4`, and if that is not available, it uses `lua` as a fallback binary name.
+
+`search-in-subs` was written and tested on Debian 12, and takes advantage of standard utilities that come with the system. In order to run `search-in-subs` on other systems, make sure that the following are installed and available on system's `PATH`:
+
+* Bash >= 5.2.15
+* Enhanced getopt
+* GNU coreutils
+* GNU sed
+
 ## Installation
 
 1. Clone this repository to a directory of your choice (e.g. `~/repos`):
@@ -181,6 +236,7 @@ EXIT CODES
        fix-digits returns the following exit codes:
 
        0   Success. No errors have occured.
+
        1   A general error has occured.
        2   Renaming failed. File with the same name already exists. See output for more details.
 
@@ -197,7 +253,7 @@ COPYRIGHT
        This is free software: you are free  to  change  and  redistribute  it.
        There is NO WARRANTY, to the extent permitted by law.
 
-FIX-DIGITS 0.1.0                     2023                        FIX-DIGITS(1)
+FIX-DIGITS 0.1.1                     2023                        FIX-DIGITS(1)
 ```
 
 ## License
