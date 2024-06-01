@@ -8,6 +8,22 @@
     </tr>
     <tr>
         <td>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.2'>0.1.2</a>
+        </td>
+        <td>
+            2024-06-01
+        </td>
+        <td>
+            <p>
+                Eliminated the limitation on using capture groups in regular expressions set with <code>-b, --before</code> and <code>-a, --after</code>.
+            </p>
+            <p>
+                Removed a redundancy in the regular expression for matching filenames.
+            </p>
+        </td>
+    </tr>
+    <tr>
+        <td>
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.1'>0.1.1</a>
         </td>
         <td>

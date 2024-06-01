@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.1.1
+version=0.1.2
 
 function repeat_str { [[ $2 = 0 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
@@ -82,26 +82,20 @@ done
 
 shopt -s extglob
 
-if [[ $opt_before =~ (^|[^\\])[()] || $opt_after =~ (^|[^\\])[()] ]]; then
-
-  printf \
-    ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
-    "${BASH_SOURCE##*/}" \
-    'Use of capture groups in regular expressions set with `-b, --before` and `-a, --after` is not allowed: --before='"${opt_before@Q}"' --after='"${opt_after@Q}" >&2
-  exit 1
-
-fi
-
 [[ $# = 0 ]] && set -- *
 
-re='('"$opt_before"')(0*[[:digit:]]+)('"$opt_after"')'
+capture_group_num_before=1 capture_group_num_num= capture_group_num_after=
+[[ _ =~ _|$opt_before ]] && capture_group_num_num=$((1 + ${#BASH_REMATCH[@]})) # Length of `BASH_REMATCH` is always one more than the total number of capture groups.
+capture_group_num_after=$((capture_group_num_num + 1))
+
+re='('"$opt_before"')([[:digit:]]+)('"$opt_after"')'
 files=()
 digits_width=
 
 for file; do
   if [[ ${file##*/} =~ $re ]]; then
     files+=("$file")
-    [[ ${#BASH_REMATCH[2]} -gt "$digits_width" ]] && digits_width="${#BASH_REMATCH[2]}"
+    [[ ${#BASH_REMATCH[$capture_group_num_num]} -gt "$digits_width" ]] && digits_width="${#BASH_REMATCH[$capture_group_num_num]}"
   fi
 done
 
@@ -121,16 +115,16 @@ while read -rd '' old_filename; do
 
   [[ ${old_filename##*/} =~ $re ]]
 
-  zero_padding=$(repeat_str '0' "$((digits_width - ${#BASH_REMATCH[2]}))")
+  zero_padding=$(repeat_str '0' "$((digits_width - ${#BASH_REMATCH[$capture_group_num_num]}))")
 
   file_path=
   [[ $old_filename = */* ]] && file_path="${old_filename%/*}" file_path="${file_path:-/}"
 
   old_filename="${old_filename//+(\/)/\/}"
 
-  file_path_filename_before=${file_path:+"$file_path"/}"${BASH_REMATCH[1]}" file_path_filename_before="${file_path_filename_before//+(\/)/\/}"
+  file_path_filename_before=${file_path:+"$file_path"/}"${BASH_REMATCH[$capture_group_num_before]}" file_path_filename_before="${file_path_filename_before//+(\/)/\/}"
 
-  new_filename="$file_path_filename_before""$zero_padding""${BASH_REMATCH[2]}""${BASH_REMATCH[3]}"
+  new_filename="$file_path_filename_before""$zero_padding""${BASH_REMATCH[$capture_group_num_num]}""${BASH_REMATCH[$capture_group_num_after]}"
 
   if [[ $old_filename != "$new_filename" && \
         -e "$new_filename" ]]; then
@@ -144,7 +138,7 @@ while read -rd '' old_filename; do
 
   printf \
     '%s'${opt_color:+'\x1b[2;48;5;234;7'${opt_rename:+';32'}'m'}'%s'${opt_color:+'\x1b['${opt_rename:+'39;'}'27m'}'%s'${opt_color:+'\x1b[49;22m'}'%s\n' \
-    "$file_path_filename_before" "$zero_padding" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+    "$file_path_filename_before" "$zero_padding" "${BASH_REMATCH[$capture_group_num_num]}" "${BASH_REMATCH[$capture_group_num_after]}"
 
   if [[ $opt_rename && \
         $old_filename != "$new_filename" ]]; then
