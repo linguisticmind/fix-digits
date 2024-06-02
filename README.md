@@ -204,10 +204,6 @@ REGULAR EXPRESSIONS
        <https://www.gnu.org/software/grep/manual/html_node/Regular-Expres‐
        sions.html>.
 
-       Using capture groups in regular expressions passed  with  -b,  --before
-       and -a, --after options is not allowed as that would break the matching
-       of parts of filenames that is required for the rename operation.
-
 FILES
        A configuration file can be used to set default options.
 
@@ -218,7 +214,6 @@ EXIT CODES
        fix-digits returns the following exit codes:
 
        0   Success. No errors have occured.
-
        1   A general error has occured.
        2   Renaming failed. File with the same name already exists. See output for more details.
 
