@@ -15,7 +15,7 @@
         </td>
         <td>
             <p>
-                Specified end of options (<code>--</code>) for the <code>mv</code> to prevent problems renaming files whose name starts with a hyphen.
+                Specified end of options (<code>--</code>) for the <code>mv</code> command to prevent problems renaming files whose name starts with a hyphen.
             </p>
             <p>
                 Updated copyright year.
