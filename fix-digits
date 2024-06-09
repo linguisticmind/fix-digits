@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # fix-digits - add leading zeros to numbers in filenames
-# copyright (c) 2023  Alex Rogers (https://github.com/linguisticmind)
+# copyright (c) 2024  Alex Rogers (https://github.com/linguisticmind)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.1.2
+version=0.1.3
 
 function repeat_str { [[ $2 = 0 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
@@ -142,7 +142,7 @@ while read -rd '' old_filename; do
 
   if [[ $opt_rename && \
         $old_filename != "$new_filename" ]]; then
-    mv "$old_filename" "$new_filename"
+    mv -- "$old_filename" "$new_filename"
   fi
 
 done < <([[ ${#files[@]} -gt 0 ]] && printf '%s\0' "${files[@]}" | sort -Vz)

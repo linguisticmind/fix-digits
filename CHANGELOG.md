@@ -8,6 +8,22 @@
     </tr>
     <tr>
         <td>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.3'>0.1.3</a>
+        </td>
+        <td>
+            2024-06-09
+        </td>
+        <td>
+            <p>
+                Specified end of options (<code>--</code>) for the <code>mv</code> to prevent problems renaming files whose name starts with a hyphen.
+            </p>
+            <p>
+                Updated copyright year.
+            </p>
+        </td>
+    </tr>
+    <tr>
+        <td>
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.2'>0.1.2</a>
         </td>
         <td>

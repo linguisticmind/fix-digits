@@ -36,17 +36,17 @@ Video tutorial:
     </tr>
     <tr>
         <td>
-            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.2'>0.1.2</a>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.1.3'>0.1.3</a>
         </td>
         <td>
-            2024-06-01
+            2024-06-09
         </td>
         <td>
             <p>
-                Eliminated the limitation on using capture groups in regular expressions set with <code>-b, --before</code> and <code>-a, --after</code>.
+                Specified end of options (<code>--</code>) for the <code>mv</code> to prevent problems renaming files whose name starts with a hyphen.
             </p>
             <p>
-                Removed a redundancy in the regular expression for matching filenames.
+                Updated copyright year.
             </p>
         </td>
     </tr>
@@ -230,7 +230,7 @@ COPYRIGHT
        This is free software: you are free  to  change  and  redistribute  it.
        There is NO WARRANTY, to the extent permitted by law.
 
-FIX-DIGITS 0.1.2                     2023                        FIX-DIGITS(1)
+FIX-DIGITS 0.1.3                     2024                        FIX-DIGITS(1)
 ```
 
 ## License
