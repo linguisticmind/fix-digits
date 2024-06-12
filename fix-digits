@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# fix-digits - add leading zeros to numbers in filenames
+# fix-digits - adjust numbers in filenames
 # copyright (c) 2024  Alex Rogers (https://github.com/linguisticmind)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,28 +16,113 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.1.3
+version=0.2.0
 
-function repeat_str { [[ $2 = 0 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
+function repeat_str { [[ $2 -lt 1 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
 getopt -T > /dev/null
 [[ $? != 4 ]] && { printf '[%s] %s\n' "${BASH_SOURCE##*/}" 'Enhanced getopt is required to run this script.' >&2; exit 1; }
 
 help='fix-digits [<options>] [<file> ...]
 
--b, --before=<regex>
+-r, --run
+        Rename the files instead of simulating the renaming.
+
+-R, --no-run
+        Do not rename the files, only simulate the renaming.
+
+-p, --print-cmd
+        Print a preview of the commands to be executed.
+
+-P, --no-print-cmd
+        Do not print a preview of the commands to be 
+        executed.
+
+-b, --match-before=<regex>
         Regular expression to match the part of the 
         filenames immediately preceding the numbers.
 
--a, --after=<regex>
+-a, --match-after=<regex>
         Regular expression to match the part of the 
         filenames immediately following the numbers.
 
--r, --rename
-        Rename the files instead of simulating the renaming.
+--match-sign
+        Match minus (-) signs preceding numbers in 
+        filenames.
 
--R, --no-rename
-        Do not rename the files, only simulate the renaming.
+--no-match-sign
+        Do not match minus (-) signs preceding numbers in 
+        filenames.
+
+-g, --preserve-gaps
+        Preserve gaps in numbering of files.
+
+-G, --no-preserve-gaps
+        Do not preserve gaps in numbering of files.
+
+-s, --shift=[+|-]<integer>
+        Increment or decrement numbers in filenames by a 
+        specified value.
+
+-z, --zero-pad[={<integer>|auto}]
+        Add leading zeros to numbers in filenames.
+
+-Z, --no-zero-pad
+        Do not add leading zeros to numbers in filenames.
+
+-n, --zero-pad-normalize
+        Remove existing leading zeros from numbers in 
+        filenames.
+
+-N, --zero-pad-no-normalize
+        Do not remove existing leading zeros from numbers 
+        in filenames.
+
+-o, --reorder
+        Change the order of files by modifying numbers in 
+        their names.
+
+-O, --no-reorder
+        Do not change the order of files by modifying 
+        numbers in their names.
+
+-f, --reorder-file=<path>
+        A custom path to a reorder file.
+
+-k, --reorder-file-keep-temporary[={always|auto|never}]
+        Whether or when to keep the temporary reorder file 
+        after an operation finishes.
+
+-K, --reorder-file-no-keep-temporary
+        Do not keep the reorder file after an operation 
+        finishes.
+
+-x, --reorder-file-clear-temporary[={always|auto|prompt|never}]
+
+        Whether or when to delete the temporary reorder 
+        file before beginning an operation.
+
+-X, --reorder-file-no-clear-temporary
+        Do not delete the reorder file before beginning an 
+        operation.
+
+-e, --reorder-file-edit[={always|auto|never}]
+        Whether or when to edit the reorder file.
+
+-E, --reorder-file-no-edit
+        Do not edit the reorder file.
+
+-m, --reorder-file-gaps-compact
+        Represent gaps with ranges in reorder file instead 
+        of one number per line.
+
+-M, --reorder-file-gaps-no-compact
+        Do not represent gaps with ranges in reorder file, 
+        but one number per line.
+
+--editor=<value>
+        A text editor to use for reordering files with -o, 
+        --reorder.
 
 -c, --color
         Colorize the output.
@@ -52,25 +137,107 @@ help='fix-digits [<options>] [<file> ...]
         Print version information.
 '
 
-opts=$(getopt -n "${BASH_SOURCE##*/}" -o 'b:,a:,r,R,c,C,h,V,' -l 'before:,after:,rename,no-rename,color,no-color,help,version,' -- "$@")
+opts=$(getopt -n "${BASH_SOURCE##*/}" -o 'r,R,p,P,b:,a:,g,G,s:,S,z::,Z,n,N,o,O,f:,k::,K,x::,X,e::,E,m,M,c,C,h,V,' -l 'run,no-run,print-cmd,no-print-cmd,match-before:,match-after:,match-sign,no-match-sign,preserve-gaps,no-preserve-gaps,shift:,no-shift,zero-pad::,no-zero-pad,zero-pad-normalize,zero-pad-no-normalize,reorder,no-reorder,reorder-file:,reorder-file-keep-temporary::,reorder-file-no-keep-temporary,reorder-file-clear-temporary::,reorder-file-no-clear-temporary,reorder-file-edit::,reorder-file-no-edit,reorder-file-gaps-compact,reorder-file-gaps-no-compact,editor:,color,no-color,help,version,' -- "$@")
 
 [[ $? != 0 ]] && exit 1
 
 eval set -- "$opts"
 
-opt_before='^'
-opt_after='-.*$'
-opt_rename=
+declare -A colors symbols
+
+opt_run=
+opt_print_cmd=
+opt_match_before='^'
+opt_match_after='-.*$'
+opt_match_sign=
+opt_preserve_gaps=1
+opt_shift=0
+opt_zero_pad='auto'
+opt_zero_pad_normalize=
+opt_reorder=
+opt_reorder_file=
+opt_reorder_file_keep_temporary='auto'
+opt_reorder_file_clear_temporary='auto'
+opt_reorder_file_edit='auto'
+opt_reorder_file_gaps_compact=
+opt_editor="${VISUAL:-${EDITOR:-nano}}"
 opt_color=1
+
+colors[sim_reorder_up]='1;2'
+colors[sim_reorder_down]='1;2'
+colors[sim_reorder_num_up]='1;2'
+colors[sim_reorder_num_down]='1;2'
+colors[sim_reorder_ditto]='1;2'
+colors[sim_reorder_none]='1;2'
+colors[sim_print_cmd_indicator]='2'
+colors[sim_filename_zero_padding]='2;7;48;5;234'
+colors[sim_print_cmd_cmd]='38;5;244'
+colors[sim_print_cmd_opt]='38;5;247'
+colors[sim_print_cmd_arg]='38;5;241'
+colors[reorder_up]='1;2;32'
+colors[reorder_down]='1;2;32'
+colors[reorder_num_up]='1;2;32'
+colors[reorder_num_down]='1;2;32'
+colors[reorder_ditto]='1;2;32'
+colors[reorder_none]='1;2;32'
+colors[filename_num]='2;48;5;234'
+colors[filename_zero_padding]='2;7;32;48;5;234'
+colors[filename_esc]='36'
+colors[print_cmd_indicator]='2;35'
+colors[print_cmd_cmd]='2;36'
+colors[print_cmd_opt]='2;36'
+colors[print_cmd_arg]='2;36'
+colors[print_cmd_comment]='38;5;241'
+
+symbols[reorder_up]='🠙'
+symbols[reorder_down]='🠛'
+symbols[reorder_ditto]='"' # If empty, symbols are repeated.
+symbols[reorder_none]='·'
+symbols[reorder_num_pos]='pre' # 'pre' or 'post'
+symbols[print_cmd_indicator]='❱'
 
 test -f "${XDG_CONFIG_HOME:-$HOME/.config}"'/fix-digits/config.bash' && source "$_"
 
+for k in "${!colors[@]}"; do
+  [[ $k != 'sim'* && ! ${colors[sim_$k]} ]] && colors[sim_$k]="${colors[sim]}"${colors[$k]:+${colors[sim]:+';'}"${colors[$k]}"}
+done
+
+for k in "${!colors[@]}"; do
+  [[ ${colors[$k]} ]] && colors[$k]=$'\x1b['"${colors[$k]}"'m'
+done
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}"'/fix-digits'
+
 while true; do
   case $1 in
-    -b | --before ) opt_before="$2"; shift 2 ;;
-    -a | --after ) opt_after="$2"; shift 2 ;;
-    -r | --rename ) opt_rename=1; shift ;;
-    -R | --no-rename ) opt_rename=; shift ;;
+    -r | --run ) opt_run=1; shift ;;
+    -R | --no-run ) opt_run=; shift ;;
+    -p | --print-cmd ) opt_print_cmd=1; shift ;;
+    -P | --no-print-cmd ) opt_print_cmd=; shift ;;
+    -b | --match-before ) opt_match_before="$2"; shift 2 ;;
+    -a | --match-after ) opt_match_after="$2"; shift 2 ;;
+    --match-sign ) opt_match_sign=1; shift  ;;
+    --no-match-sign ) opt_match_sign=; shift  ;;
+    -g | --preserve-gaps ) opt_preserve_gaps=1; shift ;;
+    -G | --no-preserve-gaps ) opt_preserve_gaps=; shift ;;
+    -s | --shift ) opt_shift="$2"; shift 2 ;;
+    -S | --no-shift ) opt_shift=; shift ;;
+    -z | --zero-pad ) opt_zero_pad="${2:-auto}"; shift 2 ;;
+    -Z | --no-zero-pad ) opt_zero_pad=0; shift ;;
+    -n | --zero-pad-normalize ) opt_zero_pad_normalize=1; shift ;;
+    -N | --zero-pad-no-normalize ) opt_zero_pad_normalize=; shift ;;
+    -o | --reorder ) opt_reorder=1; shift ;;
+    -O | --no-reorder ) opt_reorder=; shift ;;
+    -f | --reorder-file ) opt_reorder_file="$2"; shift 2 ;;
+    -k | --reorder-file-keep-temporary ) opt_reorder_file_keep_temporary="${2:-always}"; shift 2 ;;
+    -K | --reorder-file-no-keep-temporary ) opt_reorder_file_keep_temporary='never'; shift ;;
+    -x | --reorder-file-clear-temporary ) opt_reorder_file_clear_temporary="${2:-always}"; shift 2 ;;
+    -X | --reorder-file-no-clear-temporary ) opt_reorder_file_clear_temporary='never'; shift ;;
+    -e | --reorder-file-edit ) opt_reorder_file_edit="${2:-always}"; shift 2 ;;
+    -E | --reorder-file-no-edit ) opt_reorder_file_edit='never'; shift ;;
+    -m | --reorder-file-gaps-compact ) opt_reorder_file_gaps_compact=1; shift ;;
+    -M | --reorder-file-gaps-no-compact ) opt_reorder_file_gaps_compact=; shift ;;
+    --editor ) opt_editor="$2"; shift 2 ;;
     -c | --color ) opt_color=1; shift ;;
     -C | --no-color ) opt_color=; shift ;;
     -h | --help ) printf '%s\n' "$help"; exit ;;
@@ -82,24 +249,277 @@ done
 
 shopt -s extglob
 
+messages=()
+had_errors=
+
+reorder_file_is_tmp=
+
+if [[ ! $opt_reorder_file ]]; then
+  opt_reorder_file="$cache_dir"'/reorder'
+  reorder_file_is_tmp=1
+else
+  reorder_file_dir=$(dirname "$opt_reorder_file")
+  if [[ ! -d $reorder_file_dir ]]; then
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-f, --reorder-file`: '"${opt_reorder_file@Q}"'. Directory '"${reorder_file_dir@Q}"' does not exist. Please provide a path to a file in an existing directory.'
+    )")
+    had_errors=1
+  fi
+fi
+
+case $opt_reorder_file_keep_temporary in
+  always ) opt_reorder_file_keep_temporary=1 ;;
+  auto ) [[ ! $opt_run ]] && opt_reorder_file_keep_temporary=1 || opt_reorder_file_keep_temporary= ;;
+  never ) opt_reorder_file_keep_temporary= ;;
+  * )
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-k, --reorder-file-keep-temporary`: '"${opt_reorder_file_keep_temporary@Q}"'. Allowed values are `always` (or omitting the argument on the command line), `auto`, and `never`.'
+    )")
+    had_errors=1
+  ;;
+esac
+
+case $opt_reorder_file_clear_temporary in
+  always | auto | prompt | never ) ;;
+  * )
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-k, --reorder-file-clear-temporary`: '"${opt_reorder_file_clear_temporary@Q}"'. Allowed values are `always` (or omitting the argument on the command line), `auto`, `prompt`, and `never`.'
+    )")
+    had_errors=1
+  ;;
+esac
+
+case $opt_reorder_file_edit in
+  always ) opt_reorder_file_edit=1 ;;
+  auto ) ;; # Delayed until after the action on `-k, --reorder-file-clear-temporary` has been taken.
+  never ) opt_reorder_file_edit= ;;
+  * )
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-e, --reorder-file-edit`: '"${opt_reorder_file_edit@Q}"'. Allowed values are `always` (or omitting the argument on the command line), `auto`, and `never`.'
+    )")
+    had_errors=1
+  ;;
+esac
+
+case $opt_shift in
+  ?([+-])+([[:digit:]]) ) declare -i opt_shift="$opt_shift" ;;
+  * )
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-s, --shift`: '"${opt_shift@Q}"'. Only integer values are allowed.'
+    )")
+    had_errors=1
+  ;;
+esac
+
+case $opt_zero_pad in
+  +([[:digit:]]) | auto ) ;;
+  * )
+    messages+=("$(
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Invalid argument to `-z, --zero-pad`: '"${opt_zero_pad@Q}"'. Only positive integer values and `auto` (or omitting the argument on the command line) are allowed.'
+    )")
+    had_errors=1
+  ;;
+esac
+
+[[ ${#messages[@]} -gt 0 ]] && printf '%s\n' "${messages[@]}" >&2
+if [[ $had_errors ]]; then
+  exit 1
+fi
+
 [[ $# = 0 ]] && set -- *
 
-capture_group_num_before=1 capture_group_num_num= capture_group_num_after=
-[[ _ =~ _|$opt_before ]] && capture_group_num_num=$((1 + ${#BASH_REMATCH[@]})) # Length of `BASH_REMATCH` is always one more than the total number of capture groups.
-capture_group_num_after=$((capture_group_num_num + 1))
+re_num=
+[[ ! $opt_match_sign ]] && re_num='()([[:digit:]]+)' || re_num='(-?)([[:digit:]]+)'
 
-re='('"$opt_before"')([[:digit:]]+)('"$opt_after"')'
-files=()
-digits_width=
+capture_group_before=1 capture_group_num= capture_group_num_sign= capture_group_num_no_sign= capture_group_after=
+if [[ _ =~ _|$opt_match_before ]]; then
+  capture_group_num=$((1 + ${#BASH_REMATCH[@]})) # Length of `BASH_REMATCH` is always one more than the total number of capture groups.
+  capture_group_num_sign=$((capture_group_num + 1))
+  capture_group_num_no_sign=$((capture_group_num_sign + 1))
+fi
+[[ _ =~ _|$re_num ]] && capture_group_after=$((capture_group_num + ${#BASH_REMATCH[@]}))
 
-for file; do
-  if [[ ${file##*/} =~ $re ]]; then
-    files+=("$file")
-    [[ ${#BASH_REMATCH[$capture_group_num_num]} -gt "$digits_width" ]] && digits_width="${#BASH_REMATCH[$capture_group_num_num]}"
-  fi
+re_filename='('"$opt_match_before"')('"$re_num"')('"$opt_match_after"')'
+re_gap='^#[[:space:]]*gap:[[:space:]]*(-?[[:digit:]]+)([[:space:]]*-[[:space:]]*(-?[[:digit:]]+))?[[:space:]]*$'
+
+filenames_old=()
+
+for filename_old; do
+  [[ ${filename_old##*/} =~ $re_filename ]] && filenames_old+=("$filename_old")
 done
 
-if [[ ! $opt_rename ]]; then
+filenames_old_sorted=()
+declare -A filenames_old_by_num_old_no_zero_padding=()
+
+declare -A \
+  is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check=() \
+  is_missing_from_reorder_file_by_filenames_old_reorder_file_validation=() \
+  is_missing_from_reorder_file_by_gap_num=() \
+  is_present_in_reorder_file_as_filename_by_nums_old_no_zero_padding=()
+
+num_expected=1 num_actual=
+
+while read -rd '' filename_old; do
+
+  [[ ${filename_old##*/} =~ $re_filename ]]
+
+  num_old_no_sign="${BASH_REMATCH[$capture_group_num_no_sign]}" num_old_sign="${BASH_REMATCH[$capture_group_num_sign]}"
+
+  num_old_no_sign_no_zero_padding="${num_old_no_sign##+(0)}" num_old_no_sign_no_zero_padding="${num_old_no_sign_no_zero_padding:-0}" num_old_zero_padding="${num_old_no_sign%$num_old_no_sign_no_zero_padding}"
+  num_old_no_zero_padding="$num_old_sign""$num_old_no_sign_no_zero_padding"
+
+  filenames_old_by_num_old_no_zero_padding[$num_old_no_zero_padding]="$filename_old"
+
+  is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check[$filename_old]=1 # Used to make a decision when `-x, --reorder-file-clear-temporary` is set to `auto` or `prompt`.
+
+  is_missing_from_reorder_file_by_filenames_old_reorder_file_validation[$filename_old]=1 # For a reorder file validation check later. Every file that is present in the reorder file will be removed from this array. The remaining ones are the missing ones. 
+
+  is_present_in_reorder_file_as_filename_by_nums_old_no_zero_padding[$num_old_no_zero_padding]=1 # For a reorder file validation check later. This is to determine extraneous gaps, which are the ones whose numbers overlap with numbers in the filenames.
+
+done < <([[ ${#filenames_old[@]} -gt 0 ]] && printf '%s\0' "${filenames_old[@]}" | sort -nz)
+
+while read -rd '' num_old; do
+
+  filenames_old_sorted+=("${filenames_old_by_num_old_no_zero_padding[$num_old]}")
+
+  for gap_num in  $(seq "$num_expected" "$((num_old - 1))"); do
+    is_missing_from_reorder_file_by_gap_num[$gap_num]=1 # For a reorder file validation check later. These are the gaps that are present in filename numbers, and thus should be also present in the reorder file.
+  done
+
+  num_expected=$((num_old + 1))
+
+done < <([[ ${#filenames_old_by_num_old_no_zero_padding[@]} -gt 0 ]] && printf '%s\0' "${!filenames_old_by_num_old_no_zero_padding[@]}" | sort -nz)
+
+if [[ $reorder_file_is_tmp && $opt_reorder_file_clear_temporary != 'never' ]]; then
+
+  if [[ $opt_reorder_file_clear_temporary = @(auto|prompt) ]]; then
+
+    if [[ -f $opt_reorder_file ]]; then
+
+      passed_reorder_file_clear_temporary_check=
+
+      mapfile -t < <(grep -v '^#' "$opt_reorder_file")
+
+      if [[ ${#MAPFILE[@]} -ne ${#is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check[@]} ]]; then # If the number of files in the current file set does not equal the number of files in the reorder file, the reorder file does not match the current file set.
+        passed_reorder_file_clear_temporary_check=1
+      else
+
+        while read -rd '' filename_from_reorder_file; do
+
+          k="${filename_from_reorder_file/#\\#/#}" k="${k@E}"
+          k_unset="${k//\\/\\\\}" k_unset="${k_unset//\[/\\\[}" k_unset="${k_unset//\]/\\\]}"
+
+          unset 'is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check['"$k_unset"']' # This "unticks" the files from the current file set if they also occur in the reorder file. If all are unticked, then we can consider the reorder file to match the current file set.
+
+        done < <([[ ${#MAPFILE[@]} -gt 0 ]] && printf '%s\0' "${MAPFILE[@]}")
+
+        if [[ ${#is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check[@]} -gt 0 ]]; then
+          passed_reorder_file_clear_temporary_check=1
+        fi
+
+      fi
+
+    fi
+
+    cleared_to_attempt_deleting_tmp_reorder_file=
+    [[ ! -f $opt_reorder_file ]] && cleared_to_attempt_deleting_tmp_reorder_file=1
+
+    if [[ $passed_reorder_file_clear_temporary_check ]]; then
+
+      case $opt_reorder_file_clear_temporary in
+
+        auto ) cleared_to_attempt_deleting_tmp_reorder_file=1 ;;
+
+        prompt )
+
+          msg="$(
+            printf \
+              ${opt_color:+'\x1b[36m'}'[%s] %s '${opt_color:+'\x1b[39m'}'\n' \
+              "${BASH_SOURCE##*/}" \
+              'The temporary reorder file '"${opt_reorder_file@Q}"' seems to come from a different file set and should be okay to delete. Would you like to delete it? y [delete] / o [open] / N [keep]'
+          )"
+          
+          while read -ep "$msg"; do
+            case $REPLY in
+              [Yy] ) cleared_to_attempt_deleting_tmp_reorder_file=1; break ;;
+              [Oo] ) "$opt_editor" "$opt_reorder_file" ;;
+              [Nn] ) cleared_to_attempt_deleting_tmp_reorder_file=; break ;;
+              * )
+                printf \
+                  ${opt_color:+'\x1b[36m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+                  "${BASH_SOURCE##*/}" \
+                  'Please reply `y`, `o`, or `n` (case insensitive).' >&2
+              ;;
+            esac
+          done
+
+        ;;
+
+      esac
+
+    fi
+
+  fi
+
+  if [[ $opt_reorder_file_clear_temporary = 'always' || $cleared_to_attempt_deleting_tmp_reorder_file ]]; then
+
+    if [[ -f $opt_reorder_file ]]; then
+
+      rm "$opt_reorder_file" &&
+
+      if [[ ! $opt_reorder && $opt_reorder_file_clear_temporary = 'always' ]]; then
+        printf \
+          ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+          "${BASH_SOURCE##*/}" \
+          'Removed a temporary reorder file '"${opt_reorder_file@Q}"'.' >&2
+      fi
+
+    else
+
+      if [[ ! $opt_reorder && $opt_reorder_file_clear_temporary = 'always' ]]; then
+        printf \
+          ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+          "${BASH_SOURCE##*/}" \
+          'No temporary reorder file in cache ('"${cache_dir@Q}"').' >&2
+      fi
+
+    fi
+
+  fi
+
+  if [[ ! $opt_reorder && $opt_reorder_file_clear_temporary = 'always' ]]; then
+    printf \
+      ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+      "${BASH_SOURCE##*/}" \
+      'Exiting since used `-x, --reorder-file-clear-temporary`, but not reordering (`-o, --reorder`).' >&2
+    exit
+  fi
+
+fi
+
+if [[ $opt_reorder_file_edit = 'auto' ]]; then
+  [[ ! -f $opt_reorder_file ]] && opt_reorder_file_edit=1 || opt_reorder_file_edit=
+fi
+
+if [[ ! $opt_run ]]; then
   printf \
     ${opt_color:+'\x1b[2m'}'[%s] %s'${opt_color:+'\x1b[22m'}'\n' \
     "${BASH_SOURCE##*/}" \
@@ -108,46 +528,477 @@ else
   printf \
     ${opt_color:+'\x1b[32m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
     "${BASH_SOURCE##*/}" \
-    'Renaming.' >&2
+    'Running.' >&2
 fi
 
-while read -rd '' old_filename; do
+declare -i num_lowest num_highest
+[[ ${filenames_old_sorted[0]##*/} =~ $re_filename ]]
+num_lowest="${BASH_REMATCH[$capture_group_num]}"
+[[ ${filenames_old_sorted[$((${#filenames_old_sorted[@]} - 1))]##*/} =~ $re_filename ]]
+num_highest="${BASH_REMATCH[$capture_group_num]}"
 
-  [[ ${old_filename##*/} =~ $re ]]
+if [[ $opt_reorder ]]; then
+ 
+  [[ ! -d $cache_dir ]] && mkdir -p "$cache_dir"
 
-  zero_padding=$(repeat_str '0' "$((digits_width - ${#BASH_REMATCH[$capture_group_num_num]}))")
+  if [[ ! -f $opt_reorder_file ]]; then
 
-  file_path=
-  [[ $old_filename = */* ]] && file_path="${old_filename%/*}" file_path="${file_path:-/}"
+    num_old= num_expected=
+    [[ ${num_lowest_gap:-$num_lowest} -ge 1 ]] && num_expected=1 || num_expected="${num_lowest_gap:-$num_lowest}"
 
-  old_filename="${old_filename//+(\/)/\/}"
+    for filename_old in "${filenames_old_sorted[@]}"; do
 
-  file_path_filename_before=${file_path:+"$file_path"/}"${BASH_REMATCH[$capture_group_num_before]}" file_path_filename_before="${file_path_filename_before//+(\/)/\/}"
+      [[ ${filename_old##*/} =~ $re_filename ]]
 
-  new_filename="$file_path_filename_before""$zero_padding""${BASH_REMATCH[$capture_group_num_num]}""${BASH_REMATCH[$capture_group_num_after]}"
+      num_old="${BASH_REMATCH[$capture_group_num]}"
+      num_old_no_sign="${BASH_REMATCH[$capture_group_num_no_sign]}" num_old_sign="${BASH_REMATCH[$capture_group_num_sign]}"
 
-  if [[ $old_filename != "$new_filename" && \
-        -e "$new_filename" ]]; then
-    printf \
-      ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
-      "${BASH_SOURCE##*/}" \
-      'Not renaming '"${old_filename@Q}"' -> '"${new_filename@Q}"'. '"${new_filename@Q}"' already exists.' >&2
-    files_skipped=1
-    continue
+      num_old_no_sign_no_zero_padding="${num_old_no_sign##+(0)}" num_old_no_sign_no_zero_padding="${num_old_no_sign_no_zero_padding:-0}" num_old_zero_padding="${num_old_no_sign%$num_old_no_sign_no_zero_padding}"
+      num_old_no_zero_padding="$num_old_sign""$num_old_no_sign_no_zero_padding"
+
+      if [[ ! $num_old_no_zero_padding -eq $num_expected ]]; then
+        gap_end="$((num_old_no_zero_padding - 1))"
+        if [[ ! $opt_reorder_file_gaps_compact ]]; then
+          printf '# gap: %s\n' $(seq "$num_expected" "$gap_end")
+        else
+          [[ ! $num_expected -eq $gap_end ]] && printf '# gap: %s-%s\n' "$num_expected" "$gap_end" || printf '# gap: %s\n' "$num_expected"
+        fi
+      fi
+
+      filename_old="${filename_old//\\/\\\\}" filename_old="${filename_old//$'\n'/\\n}"
+      filename_old="${filename_old/##/\\#}"
+
+      printf '%s\n' "$filename_old"
+
+      num_expected=$((num_old_no_zero_padding + 1))
+
+    done > "$opt_reorder_file"
+
   fi
+
+  [[ $opt_reorder_file_edit ]] && "$opt_editor" "$opt_reorder_file"
+
+  # --- [BEGIN] Reorder File Validation ---
+
+  # Determining low and high redundant gaps.
+  mapfile -t < <(sed -nE '
+
+    1 {
+      :a /'"$re_gap"'/ {
+        H
+        n
+        /'"$re_gap"'/ b a
+        { x; l; s/'"$re_gap"'/bash -c '\''printf "%s " $(seq "$1" "${2:-$1}")'\'' _ '\''\1'\'' '\''\3'\''/gme; s/\n//g; s/\s*$//; p }
+        z; x; b b
+      }
+      /'"$re_gap"'/! { x; p; x }
+    }
+    :b /'"$re_gap"'/ {
+      H
+      $ { x; s/'"$re_gap"'/bash -c '\''printf "%s " $(seq "$1" "${2:-$1}")'\'' _ '\''\1'\'' '\''\3'\''/gme; s/\n//g; s/\s*$//; p }
+      n
+      /'"$re_gap"'/! { x; z; x }
+      b b
+    }
+
+  ' "$opt_reorder_file")
+
+  gaps_redundant_low=(${MAPFILE[0]}) gaps_redundant_high=(${MAPFILE[1]})
+
+  num_lowest_gap=$(IFS=$'\n'; <<<"${gaps_redundant_low[*]}" sort -n | head -n 1)
+  num_highest_gap=$(IFS=$'\n'; <<<"${gaps_redundant_high[*]}" sort -n | tail -n 1)
+
+  declare -A is_redundant_by_gap_num=()
+
+  for gap_num in "${gaps_redundant_low[@]}" "${gaps_redundant_high[@]}"; do
+    is_redundant_by_gap_num[$gap_num]=1 # To display a warning message later. These are the redundant gaps as determined by the sed script above.
+  done
+
+  for gap_num in $(seq "${num_lowest_gap:-$num_lowest}" "$((num_lowest - 1))") $(seq "$((num_highest + 1))" "${num_highest_gap:-$num_highest}"); do
+    is_missing_from_reorder_file_by_gap_num[$gap_num]=1 # For a reorder file validation check later. These are the gaps that should be present in the reorder file based on the lowest and highest gap values that are already present, and the lowest and highest numbers occurring in filenames.
+  done
+
+  reorder_file_is_invalid=
+  line_num=1
+
+  while read -r line; do
+
+    if [[ $line != '#'* ]]; then
+
+      k="${line/#\\#/#}" k="${k@E}"
+      k_unset="${k//\\/\\\\}" k_unset="${k_unset//\[/\\\[}" k_unset="${k_unset//\]/\\\]}"
+
+      if [[ ${is_missing_from_reorder_file_by_filenames_old_reorder_file_validation[$k]} ]]; then
+        unset 'is_missing_from_reorder_file_by_filenames_old_reorder_file_validation['"$k_unset"']'
+      else
+        printf \
+          ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+          "${BASH_SOURCE##*/}" \
+          'Line '"$line_num"' ('"${line@Q}"') in the reorder file does not match any input file.' >&2
+        reorder_file_is_invalid=1
+      fi
+
+      if [[ $gap_end ]]; then
+        not_a_gap=$((gap_end + $((++offset_from_gap_end))))
+        if [[ ${is_missing_from_reorder_file_by_gap_num[$not_a_gap]} ]]; then
+          unset 'is_missing_from_reorder_file_by_gap_num['"$not_a_gap"']' # This "unticks" the gaps that are not missing because a file was put in their place.
+        fi
+      fi
+
+    else
+
+      if [[ $line =~ $re_gap ]]; then
+
+        gaps_redundant=() gaps_extraneous=()
+        gap_start="${BASH_REMATCH[1]}" gap_end="${BASH_REMATCH[3]:-${BASH_REMATCH[1]}}"
+        offset_from_gap_end= # For "unticking" gaps that are not missing because a file was put in their place. See above.
+
+        for gap_num in $(seq "$gap_start" "$gap_end"); do
+          if [[ ${is_missing_from_reorder_file_by_gap_num[$gap_num]} ]]; then
+            unset 'is_missing_from_reorder_file_by_gap_num['"$gap_num"']' # This "unticks" the gaps that are not missing because we read them from a gap specification line.
+          fi
+          if [[ ${is_redundant_by_gap_num[$gap_num]} ]]; then
+            gaps_redundant+=("$gap_num")
+          elif [[ ${is_present_in_reorder_file_as_filename_by_nums_old_no_zero_padding[$gap_num]} ]]; then
+            gaps_extraneous+=("$gap_num")
+            reorder_file_is_invalid=1
+          fi
+        done
+
+        if [[ ${#gaps_redundant[@]} -gt 0 ]]; then
+          printf \
+            ${opt_color:+'\x1b[33m'}'[%s] %s: %s.'${opt_color:+'\x1b[39m'}'\n' \
+            "${BASH_SOURCE##*/}" \
+            'Line '"$line_num"' ('"${line@Q}"') in the reorder file specifies redundant gaps' \
+            "$(IFS=$'\n'; str="${gaps_redundant[*]}"; printf '%s' "${str//$'\n'/, }")" >&2
+        fi
+
+        if [[ ${#gaps_extraneous[@]} -gt 0 ]]; then
+          printf \
+            ${opt_color:+'\x1b[31m'}'[%s] %s: %s.'${opt_color:+'\x1b[39m'}'\n' \
+            "${BASH_SOURCE##*/}" \
+            'Line '"$line_num"' ('"${line@Q}"') in the reorder file specifies extraneous gaps' \
+            "$(IFS=$'\n'; str="${gaps_extraneous[*]}"; printf '%s' "${str//$'\n'/, }")" >&2
+        fi
+
+      fi
+
+    fi
+
+    ((line_num++))
+
+  done < "$opt_reorder_file"
+
+  for filename_old in "${filenames_old_sorted[@]}"; do
+    if [[ ${is_missing_from_reorder_file_by_filenames_old_reorder_file_validation[$filename_old]} ]]; then
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'File '"${filename_old@Q}"' is missing from the reorder file.' >&2
+      reorder_file_is_invalid=1
+    fi
+  done
+
+  if [[ ${#is_missing_from_reorder_file_by_gap_num[@]} -gt 0 ]]; then
+    printf \
+      ${opt_color:+'\x1b[31m'}'[%s] %s: %s.'${opt_color:+'\x1b[39m'}'\n' \
+      "${BASH_SOURCE##*/}" \
+      'The following gaps are not specified in the reorder file' \
+      "$(str=$(IFS=$'\n'; <<<"${!is_missing_from_reorder_file_by_gap_num[*]}" sort -n); printf '%s' "${str//$'\n'/, }")" >&2
+    reorder_file_is_invalid=1
+  fi
+
+  if [[ $reorder_file_is_invalid ]]; then
+    printf \
+      ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+      "${BASH_SOURCE##*/}" \
+      'Reorder file '"${opt_reorder_file@Q}"' is invalid.' >&2
+    exit 3
+  fi
+  
+  # --- [END] Reorder File Validation ---
+
+fi
+
+[[ ! $opt_run ]] && no_run=1
+
+num_old= num_new=
+
+num_expected="${num_lowest_gap:-$num_lowest}" num_next="${num_lowest_gap:-$num_lowest}"
+
+num_old_num_new_diff= old_num_old_num_new_diff=
+declare -A reorder_symbols_by_filenames_old=()
+
+declare -A nums_new_by_filenames_old=() filenames_old_by_nums_new=()
+
+[[ $opt_reorder ]] && filenames_old=() # When we are reordering, we won't need this array since we'll have the reorder file. In that case, we will rebuild this array in the while-read loop below with its elements in the new order.
+
+shifted=
+[[ $opt_shift -ne 0 ]] && shifted=1
+
+while read -rd '' filename_old; do
+
+  if [[ ! $opt_reorder || $filename_old != '#'* ]]; then # If we are not reordering; or *are* reordering, and the input line is not a comment line (so, represents a file).
+
+    filename_old="${filename_old/#\\#/#}"
+
+    if [[ $opt_reorder ]]; then
+      filename_old="${filename_old@E}"
+      filenames_old+=("$filename_old") # Rebuilding the `filenames_old` array with its elements in the new order.
+    fi
+
+    [[ ${filename_old##*/} =~ $re_filename ]]
+
+    num_old="${BASH_REMATCH[$capture_group_num]}"
+    num_old_no_sign="${BASH_REMATCH[$capture_group_num_no_sign]}" num_old_sign="${BASH_REMATCH[$capture_group_num_sign]}"
+
+    num_old_no_sign_no_zero_padding="${num_old_no_sign##+(0)}" num_old_no_sign_no_zero_padding="${num_old_no_sign_no_zero_padding:-0}" num_old_zero_padding="${num_old_no_sign%$num_old_no_sign_no_zero_padding}"
+    num_old_no_zero_padding="$num_old_sign""$num_old_no_sign_no_zero_padding"
+
+    if [[ $opt_reorder ]]; then
+      num_new="$num_next"
+    else
+      [[ $opt_preserve_gaps ]] && num_new="$num_old_no_zero_padding" || num_new="$num_expected"
+    fi
+
+    old_num_old_num_new_diff="$num_old_num_new_diff"
+
+    num_new_no_zero_padding=$((num_new + opt_shift))
+
+    num_new_zero_padding=
+    [[ ! $opt_zero_pad_normalize && ${#num_old_zero_padding} -gt 0 ]] && num_new_zero_padding="$(repeat_str '0' "$((${#num_old_zero_padding} - (${#num_new_no_zero_padding} - ${#num_old_no_zero_padding})))")"
+    num_new="$num_new_zero_padding""$num_new_no_zero_padding"
+
+    num_old_num_new_diff=$((num_old_no_zero_padding - num_new_no_zero_padding))
+
+    if [[ ${symbols[reorder_ditto]} && $num_old_num_new_diff -ne 0 && $old_num_old_num_new_diff -eq $num_old_num_new_diff ]]; then
+      reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_ditto]}"}"${symbols[reorder_ditto]}"${opt_color:+${colors[${no_run:+sim_}reorder_ditto]:+$'\x1b[0m'}}
+    elif [[ $num_old_num_new_diff -gt 0 ]]; then
+      reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_up]}"}"${symbols[reorder_up]}"${opt_color:+${colors[${no_run:+sim_}reorder_up]:+$'\x1b[0m'}}
+      case ${symbols[reorder_num_pos]} in
+        pre ) reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_num_up]}"}"$num_old_num_new_diff"${opt_color:+${colors[${no_run:+sim_}reorder_num_up]:+$'\x1b[0m'}}"${reorder_symbols_by_filenames_old[$filename_old]}" ;;
+        post ) reorder_symbols_by_filenames_old[$filename_old]+=${opt_color:+"${colors[${no_run:+sim_}reorder_num_up]}"}"$num_old_num_new_diff"${opt_color:+${colors[${no_run:+sim_}reorder_num_up]:+$'\x1b[0m'}} ;;
+      esac
+    elif [[ $num_old_num_new_diff -lt 0 ]]; then
+      reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_down]}"}"${symbols[reorder_down]}"${opt_color:+${colors[${no_run:+sim_}reorder_down]:+$'\x1b[0m'}}
+      case ${symbols[reorder_num_pos]} in
+        pre ) reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_num_down]}"}"${num_old_num_new_diff#-}"${opt_color:+${colors[${no_run:+sim_}reorder_down]:+$'\x1b[0m'}}"${reorder_symbols_by_filenames_old[$filename_old]}" ;;
+        post ) reorder_symbols_by_filenames_old[$filename_old]+=${opt_color:+"${colors[${no_run:+sim_}reorder_num_down]}"}"${num_old_num_new_diff#-}"${opt_color:+${colors[${no_run:+sim_}reorder_num_down]:+$'\x1b[0m'}} ;;
+      esac
+    fi
+
+    nums_new_by_filenames_old[$filename_old]="$num_new"
+    filenames_old_by_nums_new[$num_new]="$filename_old"
+
+    ((num_expected++, num_next++))
+
+  else # If we are reordering, and the input line is a comment line.
+    
+    if [[ ${filename_old##*/} =~ $re_gap ]]; then # If the comment line represents a gap.
+
+      num_gaps=$((${BASH_REMATCH[3]:-${BASH_REMATCH[1]}} - ${BASH_REMATCH[1]}))
+
+      [[ $opt_preserve_gaps ]] && num_next=$((num_next + num_gaps + 1))
+
+    fi
+
+  fi
+
+done < <(
+  if [[ $opt_reorder ]]; then
+    <"$opt_reorder_file" mapfile -t
+    printf '%s\0' "${MAPFILE[@]}"
+    [[ $reorder_file_is_tmp && ! $opt_reorder_file_keep_temporary ]] && rm "$opt_reorder_file"
+  else
+    [[ ${#filenames_old_sorted[@]} -gt 0 ]] && printf '%s\0' "${filenames_old_sorted[@]/##/\\#}"
+  fi
+)
+
+if [[ ${#reorder_symbols_by_filenames_old[@]} -gt 0 && ${symbols[reorder_none]} ]]; then
+  for filename_old in "${filenames_old_sorted[@]}"; do
+    [[ ! ${reorder_symbols_by_filenames_old[$filename_old]} ]] && reorder_symbols_by_filenames_old[$filename_old]=${opt_color:+"${colors[${no_run:+sim_}reorder_none]}"}"${symbols[reorder_none]}"${opt_color:+${colors[${no_run:+sim_}reorder_none]:+$'\x1b[0m'}}
+  done
+fi
+
+declare -A widths=(
+  [reorder_symbols]=
+  [digits]=
+  [print_cmd_indicator]=
+)
+
+for reorder_symbol in "${reorder_symbols_by_filenames_old[@]}"; do
+  width="$(<<<"${reorder_symbol//$'\x1b['*([[:digit:];])'m'/}" wc -L)" 
+  [[ $width -gt ${widths[reorder_symbols]} ]] && widths[reorder_symbols]="$width"
+done
+
+case $opt_zero_pad in
+  +([[:digit:]]) ) digits_width="$opt_zero_pad" ;;
+  auto )
+    for num_new in "${nums_new_by_filenames_old[@]}"; do
+      [[ ${#num_new} -gt ${widths[digits]} ]] && num_new_no_sign="${num_new#-}" widths[digits]="${#num_new_no_sign}"
+    done
+  ;;
+esac
+
+declare -A filenames_new_by_filenames_new_tmp=()
+declare -a filenames_new_by_filenames_new_tmp_order=() \
+           filenames_new_unable_to_rename=()
+
+was_unable_to_rename_some_files=
+
+while read -rd '' filename_old; do
+
+  [[ ${filename_old##*/} =~ $re_filename ]]
+
+  num_new_no_sign="${nums_new_by_filenames_old[$filename_old]#-}" num_new_sign="${nums_new_by_filenames_old[$filename_old]%%+([[:digit:]])}"
+
+  case $opt_zero_pad in
+    auto ) num_new_zero_padding=$(repeat_str '0' "$((${widths[digits]} - ${#num_new_no_sign}))") ;;
+    +([[:digit:]]) ) num_new_zero_padding=$(repeat_str '0' "$((opt_zero_pad - ${#num_new_no_sign}))") ;;
+  esac
+
+  file_dir=
+  [[ $filename_old = */* ]] && file_dir="${filename_old%/*}" file_dir="${file_dir:-/}"
+
+  filename_old="${filename_old//+(\/)/\/}"
+
+  file_filename_before="${BASH_REMATCH[$capture_group_before]}" file_filename_before="${file_filename_before//+(\/)/\/}"
+  file_dir_filename_before=${file_dir:+"$file_dir"/}"$file_filename_before"
+  file_filename_after="${BASH_REMATCH[$capture_group_after]}"
+
+  filename_new="$file_dir_filename_before""$num_new_sign""$num_new_zero_padding""$num_new_no_sign""$file_filename_after"
+
+  filename_new_tmp=
+
+  if [[ $filename_old != "$filename_new" ]]; then # If `filename_old` and `filename_new` are the same, we don't perform any operation on the file.
+
+    if [[ -e $filename_new ]]; then # But what if they are different, and `filename_new` already exists?
+
+      if [[ ${nums_new_by_filenames_old[$filename_new]} ]]; then # If it's one of the files in this operation, do the switcheroo.
+
+        while [[ -e ${filename_new_tmp:=$filename_new} ]]; do
+          filename_new_tmp+='_'
+        done
+
+        [[ $filename_new_tmp ]] && filenames_new_by_filenames_new_tmp[$filename_new_tmp]="$filename_new" filenames_new_by_filenames_new_tmp_order+=("$filename_new_tmp")
+
+      else # Otherwise, refuse to rename.
+
+        filenames_new_unable_to_rename+=("$filename_new")
+
+        printf \
+          ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+          "${BASH_SOURCE##*/}" \
+          'Not renaming '"${filename_old@Q}"' -> '"${filename_new@Q}"'. '"${filename_new@Q}"' already exists.' >&2
+        was_unable_to_rename_some_files=1
+        continue
+
+      fi
+
+    fi
+
+  fi
+
+  file_dir_filename_before_display="${file_dir_filename_before//\\/${opt_color:+"${colors[${no_run:+sim_}filename_esc]}"}\\\\${opt_color:+"${colors[${no_run:+sim_}filename_esc]:+$'\x1b[0m'}"}}" file_dir_filename_before_display="${file_dir_filename_before_display//$'\n'/${opt_color:+"${colors[${no_run:+sim_}filename_esc]}"}\\n${opt_color:+"${colors[${no_run:+sim_}filename_esc]:+$'\x1b[0m'}"}}"
+  file_filename_after_display="${file_filename_after//\\/${opt_color:+"${colors[${no_run:+sim_}filename_esc]}"}\\\\${opt_color:+"${colors[${no_run:+sim_}filename_esc]:+$'\x1b[0m'}"}}" file_filename_after_display="${file_filename_after_display//$'\n'/${opt_color:+"${colors[${no_run:+sim_}filename_esc]}"}\\n${opt_color:+"${colors[${no_run:+sim_}filename_esc]:+$'\x1b[0m'}"}}"
+
+  format_str=
+  [[ ${reorder_symbols_by_filenames_old[@]} ]] &&
+    format_str+='%*s ' # reorder symbol
+  format_str+='%s' # before
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_num]}"}
+  format_str+='%s' # sign
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_num]:+$'\x1b[0m'}"}
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_zero_padding]}"}
+  format_str+='%s' # added zeros
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_zero_padding]:+$'\x1b[0m'}"}
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_num]}"}
+  format_str+='%s' # number
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}filename_num]:+$'\x1b[0m'}"}
+  format_str+='%s\n' # after
+
+  reorder_symbol_width=$(((${widths[reorder_symbols]} - $(<<<"${reorder_symbols_by_filenames_old[$filename_old]//$'\x1b['*([[:digit:];])'m'/}" wc -L)) + $(printf '%s' "${reorder_symbols_by_filenames_old[$filename_old]}" | wc -c))) # (maximum display width - current display width) + current byte width
 
   printf \
-    '%s'${opt_color:+'\x1b[2;48;5;234;7'${opt_rename:+';32'}'m'}'%s'${opt_color:+'\x1b['${opt_rename:+'39;'}'27m'}'%s'${opt_color:+'\x1b[49;22m'}'%s\n' \
-    "$file_path_filename_before" "$zero_padding" "${BASH_REMATCH[$capture_group_num_num]}" "${BASH_REMATCH[$capture_group_num_after]}"
+    "$format_str" \
+    ${reorder_symbols_by_filenames_old[@]:+"$reorder_symbol_width"} ${reorder_symbols_by_filenames_old[@]:+"${reorder_symbols_by_filenames_old[$filename_old]}"} \
+    "$file_dir_filename_before_display" "$num_new_sign" "$num_new_zero_padding" "$num_new_no_sign" "$file_filename_after_display"
 
-  if [[ $opt_rename && \
-        $old_filename != "$new_filename" ]]; then
-    mv -- "$old_filename" "$new_filename"
+  if [[ $filename_old != "$filename_new" ]]; then
+
+    cmd_args_mv_opts=(--)
+    cmd_args_mv_nonopts=("$filename_old" "${filename_new_tmp:-$filename_new}")
+
+    if [[ $opt_print_cmd ]]; then
+
+      format_str=${opt_color:+"${colors[${no_run:+sim_}print_cmd_indicator]}"}'%*s'${opt_color:+${colors[${no_run:+sim_}print_cmd_indicator]:+$'\x1b[0m'}}' '
+      format_str+=${opt_color:+"${colors[${no_run:+sim_}print_cmd_cmd]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_cmd]:+$'\x1b[0m'}}' '
+
+      printf "$format_str" "${widths[print_cmd_indicator]}" "${symbols[print_cmd_indicator]}" mv
+      printf \
+        ${opt_color:+"${colors[${no_run:+sim_}print_cmd_opt]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_opt]:+$'\x1b[0m'}}' ' \
+        "${cmd_args_mv_opts[@]}"
+      printf \
+        ${opt_color:+"${colors[${no_run:+sim_}print_cmd_arg]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_arg]:+$'\x1b[0m'}}' ' \
+        "${cmd_args_mv_nonopts[@]@Q}"
+      [[ $filename_new_tmp ]] &&
+        printf \
+          ${opt_color:+"${colors[${no_run:+sim_}print_cmd_comment]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_comment]:+$'\x1b[0m'}} \
+          '# old > tmp'
+      printf '\n'
+
+    fi
+
+    [[ $opt_run ]] && mv "${cmd_args_mv_opts[@]}" "${cmd_args_mv_nonopts[@]}"
+
   fi
 
-done < <([[ ${#files[@]} -gt 0 ]] && printf '%s\0' "${files[@]}" | sort -Vz)
+done < <(
+  if [[ ${#filenames_old_by_nums_new[@]} -gt 0 ]]; then
+    while read -rd '' k; do
+      printf '%s\0' "${filenames_old_by_nums_new[$k]}"
+    done < <(printf '%s\0' "${!filenames_old_by_nums_new[@]}" | sort -nz)
+  fi
+)
 
-if [[ ! $opt_rename ]]; then
+if [[ $opt_print_cmd && ${#filenames_new_by_filenames_new_tmp[@]} -gt 0 ]]; then
+
+  format_str=${opt_color:+"${colors[${no_run:+sim_}print_cmd_indicator]}"}'%*s'${opt_color:+${colors[${no_run:+sim_}print_cmd_indicator]:+$'\x1b[0m'}}' '
+  format_str+=${opt_color:+"${colors[${no_run:+sim_}print_cmd_comment]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_comment]:+$'\x1b[0m'}}'\n' \
+
+  printf "$format_str" "${widths[print_cmd_indicator]}" "${symbols[print_cmd_indicator]}" '# --- handling tmp filenames ---'
+
+fi
+
+for filename_new_tmp in "${filenames_new_by_filenames_new_tmp_order[@]}"; do
+
+  cmd_args_mv_opts=(--)
+  cmd_args_mv_nonopts=("$filename_new_tmp" "${filenames_new_by_filenames_new_tmp[$filename_new_tmp]}")
+
+  if [[ $opt_print_cmd ]]; then
+
+    format_str=${opt_color:+"${colors[${no_run:+sim_}print_cmd_indicator]}"}'%*s'${opt_color:+${colors[${no_run:+sim_}print_cmd_indicator]:+$'\x1b[0m'}}' '
+    format_str+=${opt_color:+"${colors[${no_run:+sim_}print_cmd_cmd]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_cmd]:+$'\x1b[0m'}}' '
+
+    printf "$format_str" "${widths[print_cmd_indicator]}" "${symbols[print_cmd_indicator]}" mv
+    printf \
+      ${opt_color:+"${colors[${no_run:+sim_}print_cmd_opt]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_opt]:+$'\x1b[0m'}}' ' \
+      "${cmd_args_mv_opts[@]}"
+    printf \
+      ${opt_color:+"${colors[${no_run:+sim_}print_cmd_arg]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_arg]:+$'\x1b[0m'}}' ' \
+      "${cmd_args_mv_nonopts[@]@Q}"
+    printf \
+      ${opt_color:+"${colors[${no_run:+sim_}print_cmd_comment]}"}'%s'${opt_color:+${colors[${no_run:+sim_}print_cmd_comment]:+$'\x1b[0m'}} \
+      '# tmp > new'
+    printf '\n'
+
+  fi
+
+  [[ $opt_run ]] && mv "${cmd_args_mv_opts[@]}" "${cmd_args_mv_nonopts[@]}"
+
+done
+
+if [[ ! $opt_run ]]; then
   printf \
     ${opt_color:+'\x1b[2m'}'[%s] %s'${opt_color:+'\x1b[22m'}'\n' \
     "${BASH_SOURCE##*/}" \
@@ -156,13 +1007,15 @@ else
   printf \
     ${opt_color:+'\x1b[32m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
     "${BASH_SOURCE##*/}" \
-    'Done renaming.' >&2
+    'Done.' >&2
 fi
 
-if [[ $files_skipped ]]; then
+if [[ $was_unable_to_rename_some_files ]]; then
   printf \
-    ${opt_color:+'\x1b[33m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+    ${opt_color:+'\x1b[31m'}'[%s] %s\n' \
     "${BASH_SOURCE##*/}" \
-    'Some files were not renamed because other files with the same name already existed.' >&2
+    'Unable to rename some of the files because other files with the same name already existed:' >&2
+  printf '%s\n' "${filenames_new_unable_to_rename[@]@Q}"
+  printf ${opt_color:+'\x1b[39m'}
   exit 2
 fi
