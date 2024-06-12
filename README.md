@@ -31,7 +31,7 @@ Video tutorials:
 <table>
     <tr>
         <td align='center'>
-            <b>v0.2.0</b>: reordering, incrementing or decrementing, removing gaps
+            <b>v0.2.0</b>: reordering, incrementing or<br>decrementing, removing gaps
         </td>
         <td align='center'>
             <b>v0.1.0</b>: zero-padding numbers in filenames
