@@ -11,7 +11,7 @@
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.0'>0.2.0</a>
         </td>
         <td>
-            -
+            2024-06-12
         </td>
         <td>
             <p>
