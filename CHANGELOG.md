@@ -8,6 +8,19 @@
     </tr>
     <tr>
         <td>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.1'>0.2.1</a>
+        </td>
+        <td>
+            2024-06-17
+        </td>
+        <td>
+            <p>
+               Fixed the default prompt reply not working (when <code>-x, --reorder-file-clear-temporary</code> is set to <code>prompt</code>). 
+            </p>
+        </td>
+    </tr>
+    <tr>
+        <td>
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.0'>0.2.0</a>
         </td>
         <td>

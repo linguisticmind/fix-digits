@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.2.0
+version=0.2.1
 
 function repeat_str { [[ $2 -lt 1 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
@@ -461,7 +461,7 @@ if [[ $reorder_file_is_tmp && $opt_reorder_file_clear_temporary != 'never' ]]; t
             case $REPLY in
               [Yy] ) cleared_to_attempt_deleting_tmp_reorder_file=1; break ;;
               [Oo] ) "$opt_editor" "$opt_reorder_file" ;;
-              [Nn] ) cleared_to_attempt_deleting_tmp_reorder_file=; break ;;
+              '' | [Nn] ) cleared_to_attempt_deleting_tmp_reorder_file=; break ;;
               * )
                 printf \
                   ${opt_color:+'\x1b[36m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
