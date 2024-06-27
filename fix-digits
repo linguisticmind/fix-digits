@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version=0.2.1
+version=0.2.2
 
 function repeat_str { [[ $2 -lt 1 ]] && return; printf -- "$1"'%.s' $(seq 1 $2); }
 
@@ -367,7 +367,8 @@ for filename_old; do
 done
 
 filenames_old_sorted=()
-declare -A filenames_old_by_num_old_no_zero_padding=()
+declare -A filenames_old_by_num_old_no_zero_padding_versioned=() \
+           nums_old_no_zero_padding_versions=()
 
 declare -A \
   is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check=() \
@@ -386,7 +387,10 @@ while read -rd '' filename_old; do
   num_old_no_sign_no_zero_padding="${num_old_no_sign##+(0)}" num_old_no_sign_no_zero_padding="${num_old_no_sign_no_zero_padding:-0}" num_old_zero_padding="${num_old_no_sign%$num_old_no_sign_no_zero_padding}"
   num_old_no_zero_padding="$num_old_sign""$num_old_no_sign_no_zero_padding"
 
-  filenames_old_by_num_old_no_zero_padding[$num_old_no_zero_padding]="$filename_old"
+  nums_old_no_zero_padding_versions[$num_old_no_zero_padding]=$((${nums_old_no_zero_padding_versions[$num_old_no_zero_padding]} + 1))
+
+  num_old_no_zero_padding_versioned="$num_old_no_zero_padding"'.'"${nums_old_no_zero_padding_versions[$num_old_no_zero_padding]}"
+  filenames_old_by_num_old_no_zero_padding_versioned[$num_old_no_zero_padding_versioned]="$filename_old"
 
   is_missing_from_reorder_file_by_filenames_old_reorder_file_clear_temporary_check[$filename_old]=1 # Used to make a decision when `-x, --reorder-file-clear-temporary` is set to `auto` or `prompt`.
 
@@ -396,9 +400,11 @@ while read -rd '' filename_old; do
 
 done < <([[ ${#filenames_old[@]} -gt 0 ]] && printf '%s\0' "${filenames_old[@]}" | sort -nz)
 
-while read -rd '' num_old; do
+while read -rd '' num_old_versioned; do
 
-  filenames_old_sorted+=("${filenames_old_by_num_old_no_zero_padding[$num_old]}")
+  filenames_old_sorted+=("${filenames_old_by_num_old_no_zero_padding_versioned[$num_old_versioned]}")
+
+  num_old="${num_old_versioned%.*}"
 
   for gap_num in  $(seq "$num_expected" "$((num_old - 1))"); do
     is_missing_from_reorder_file_by_gap_num[$gap_num]=1 # For a reorder file validation check later. These are the gaps that are present in filename numbers, and thus should be also present in the reorder file.
@@ -406,7 +412,7 @@ while read -rd '' num_old; do
 
   num_expected=$((num_old + 1))
 
-done < <([[ ${#filenames_old_by_num_old_no_zero_padding[@]} -gt 0 ]] && printf '%s\0' "${!filenames_old_by_num_old_no_zero_padding[@]}" | sort -nz)
+done < <([[ ${#filenames_old_by_num_old_no_zero_padding_versioned[@]} -gt 0 ]] && printf '%s\0' "${!filenames_old_by_num_old_no_zero_padding_versioned[@]}" | sort -Vz)
 
 if [[ $reorder_file_is_tmp && $opt_reorder_file_clear_temporary != 'never' ]]; then
 
@@ -729,7 +735,7 @@ num_expected="${num_lowest_gap:-$num_lowest}" num_next="${num_lowest_gap:-$num_l
 num_old_num_new_diff= old_num_old_num_new_diff=
 declare -A reorder_symbols_by_filenames_old=()
 
-declare -A nums_new_by_filenames_old=() filenames_old_by_nums_new=()
+declare -A nums_new_by_filenames_old=() filenames_old_by_nums_new_versioned=() nums_new_versions=()
 
 [[ $opt_reorder ]] && filenames_old=() # When we are reordering, we won't need this array since we'll have the reorder file. In that case, we will rebuild this array in the while-read loop below with its elements in the new order.
 
@@ -788,7 +794,11 @@ while read -rd '' filename_old; do
     fi
 
     nums_new_by_filenames_old[$filename_old]="$num_new"
-    filenames_old_by_nums_new[$num_new]="$filename_old"
+
+    nums_new_versions[$num_new]=$((${nums_new_versions[$num_new]} + 1))
+
+    num_new_versioned="$num_new"'.'"${nums_new_versions[$num_new]}"
+    filenames_old_by_nums_new_versioned[$num_new_versioned]="$filename_old"
 
     ((num_expected++, num_next++))
 
@@ -954,10 +964,10 @@ while read -rd '' filename_old; do
   fi
 
 done < <(
-  if [[ ${#filenames_old_by_nums_new[@]} -gt 0 ]]; then
+  if [[ ${#filenames_old_by_nums_new_versioned[@]} -gt 0 ]]; then
     while read -rd '' k; do
-      printf '%s\0' "${filenames_old_by_nums_new[$k]}"
-    done < <(printf '%s\0' "${!filenames_old_by_nums_new[@]}" | sort -nz)
+      printf '%s\0' "${filenames_old_by_nums_new_versioned[$k]}"
+    done < <(printf '%s\0' "${!filenames_old_by_nums_new_versioned[@]}" | sort -nz)
   fi
 )
 

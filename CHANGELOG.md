@@ -8,6 +8,19 @@
     </tr>
     <tr>
         <td>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.2'>0.2.2</a>
+        </td>
+        <td>
+            2024-06-27
+        </td>
+        <td>
+            <p>
+               Fixed a bug that prevented renaming of identically numbered files. 
+            </p>
+        </td>
+    </tr>
+    <tr>
+        <td>
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.1'>0.2.1</a>
         </td>
         <td>

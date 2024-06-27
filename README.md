@@ -61,14 +61,14 @@ Video tutorials:
     </tr>
     <tr>
         <td>
-            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.1'>0.2.1</a>
+            <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.2'>0.2.2</a>
         </td>
         <td>
-            2024-06-17
+            2024-06-27
         </td>
         <td>
             <p>
-               Fixed the default prompt reply not working (when <code>-x, --reorder-file-clear-temporary</code> is set to <code>prompt</code>). 
+               Fixed a bug that prevented renaming of identically numbered files. 
             </p>
         </td>
     </tr>
@@ -496,7 +496,7 @@ COPYRIGHT
        This is free software: you are free  to  change  and  redistribute  it.
        There is NO WARRANTY, to the extent permitted by law.
 
-FIX-DIGITS 0.2.1                     2024                        FIX-DIGITS(1)
+FIX-DIGITS 0.2.2                     2024                        FIX-DIGITS(1)
 ```
 
 ## License
