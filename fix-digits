@@ -967,7 +967,7 @@ done < <(
   if [[ ${#filenames_old_by_nums_new_versioned[@]} -gt 0 ]]; then
     while read -rd '' k; do
       printf '%s\0' "${filenames_old_by_nums_new_versioned[$k]}"
-    done < <(printf '%s\0' "${!filenames_old_by_nums_new_versioned[@]}" | sort -nz)
+    done < <(printf '%s\0' "${!filenames_old_by_nums_new_versioned[@]}" | sort -Vz)
   fi
 )
 
