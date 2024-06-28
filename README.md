@@ -74,11 +74,11 @@ Video tutorials:
     </tr>
 </table>
 
+[Read more](CHANGELOG.md)
+
 ## Known issues
 
 Renaming identically numbered files currently does not work correctly for reordering (`-o, --reorder`). To work around this, split the file set into batches in which numbers do not repeat, and reorder files in those batches separately.
-
-[Read more](CHANGELOG.md)
 
 ## Dependencies
 
