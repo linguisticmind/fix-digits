@@ -68,11 +68,15 @@ Video tutorials:
         </td>
         <td>
             <p>
-               Fixed a bug that prevented renaming of identically numbered files. 
+               Fixed a bug that prevented renaming of identically numbered files. This currently does not work for reordering. 
             </p>
         </td>
     </tr>
 </table>
+
+## Known issues
+
+Renaming identically numbered files currently does not work correctly for reordering (`-o, --reorder`). To work around this, split the file set into batches in which numbers do not repeat, and reorder files in those batches separately.
 
 [Read more](CHANGELOG.md)
 
