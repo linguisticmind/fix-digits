@@ -319,6 +319,10 @@ A temporary reorder file that is generated when using \fB-o, --reorder\fR is sto
 
 The cache directory's location is \fI$XDG_CACHE_HOME/fix-digits\fR. If \fIXDG_CACHE_HOME\fR is not set, it defaults to \fI~/.cache\fR.
 
+.SH BUGS
+
+Renaming identically numbered files currently does not work when reordering (\fB-o, --reorder\fR). To work around this, split the file set into batches in which numbers do not repeat, and reorder each batch separately.
+
 .SH AUTHOR
 
 Alex Rogers <https://github.com/linguisticmind>

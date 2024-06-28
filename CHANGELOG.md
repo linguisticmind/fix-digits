@@ -11,11 +11,11 @@
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.2'>0.2.2</a>
         </td>
         <td>
-            2024-06-27
+            2024-06-28
         </td>
         <td>
             <p>
-               Fixed a bug that prevented renaming of identically numbered files. 
+               Fixed a bug that prevented renaming of identically numbered files. This currently does not work when reordering (<code>-o, --reorder</code>). If such a reordering is attempted, an error message suggesting a workaround is shown: <code>Reordering identically numbered files is not supported. To work around this, split the file set into batches in which numbers do not repeat, and reorder each batch separately.</code>. Then the program exits.
             </p>
         </td>
     </tr>

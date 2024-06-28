@@ -64,11 +64,11 @@ Video tutorials:
             <a href='https://github.com/linguisticmind/fix-digits/releases/tag/v0.2.2'>0.2.2</a>
         </td>
         <td>
-            2024-06-27
+            2024-06-28
         </td>
         <td>
             <p>
-               Fixed a bug that prevented renaming of identically numbered files. This currently does not work for reordering. 
+               Fixed a bug that prevented renaming of identically numbered files. This currently does not work when reordering (<code>-o, --reorder</code>). If such a reordering is attempted, an error message suggesting a workaround is shown: <code>Reordering identically numbered files is not supported. To work around this, split the file set into batches in which numbers do not repeat, and reorder each batch separately.</code>. Then the program exits.
             </p>
         </td>
     </tr>
@@ -78,7 +78,7 @@ Video tutorials:
 
 ## Known issues
 
-Renaming identically numbered files currently does not work correctly for reordering (`-o, --reorder`). To work around this, split the file set into batches in which numbers do not repeat, and reorder files in those batches separately.
+Renaming identically numbered files currently does not work when reordering (`-o, --reorder`). To work around this, split the file set into batches in which numbers do not repeat, and reorder each batch separately.
 
 ## Dependencies
 
@@ -487,6 +487,12 @@ FILES
        The  cache  directory's  location  is  $XDG_CACHE_HOME/fix-digits.   If
        XDG_CACHE_HOME is not set, it defaults to ~/.cache.
 
+BUGS
+       Renaming  identically  numbered  files currently does not work when re‐
+       ordering (-o, --reorder). To work around this, split the file set  into
+       batches  in  which  numbers do not repeat, and reorder each batch sepa‐
+       rately.
+
 AUTHOR
        Alex Rogers <https://github.com/linguisticmind>
 
@@ -494,10 +500,10 @@ HOMEPAGE
        <https://github.com/linguisticmind/fix-digits>
 
 COPYRIGHT
-       Copyright  ©  2023  Alex  Rogers.  License GPLv3+: GNU GPL version 3 or
+       Copyright © 2023 Alex Rogers. License GPLv3+:  GNU  GPL  version  3  or
        later <https://gnu.org/licenses/gpl.html>.
 
-       This is free software: you are free  to  change  and  redistribute  it.
+       This  is  free  software:  you  are free to change and redistribute it.
        There is NO WARRANTY, to the extent permitted by law.
 
 FIX-DIGITS 0.2.2                     2024                        FIX-DIGITS(1)

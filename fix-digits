@@ -400,6 +400,20 @@ while read -rd '' filename_old; do
 
 done < <([[ ${#filenames_old[@]} -gt 0 ]] && printf '%s\0' "${filenames_old[@]}" | sort -nz)
 
+if [[ $opt_reorder ]]; then
+
+  for version in "${nums_old_no_zero_padding_versions[@]}"; do
+    if [[ $version -gt 1 ]]; then
+      printf \
+        ${opt_color:+'\x1b[31m'}'[%s] %s'${opt_color:+'\x1b[39m'}'\n' \
+        "${BASH_SOURCE##*/}" \
+        'Reordering identically numbered files is not supported. To work around this, split the file set into batches in which numbers do not repeat, and reorder each batch separately.' >&2
+      exit 1
+    fi
+  done
+
+fi
+
 while read -rd '' num_old_versioned; do
 
   filenames_old_sorted+=("${filenames_old_by_num_old_no_zero_padding_versioned[$num_old_versioned]}")
